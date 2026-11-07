@@ -270,22 +270,30 @@ def MC_step(arr,Ts,nmax):
 '''
 def MC_step(arr, Ts, nmax):
 
-    scale = 0.1 + Ts
     i, j = np.indices((nmax, nmax))
     masks = [(i + j) % 2 == 0,
              (i + j) % 2 == 1]
-
-
+    
+    scale = 0.1 + Ts
+    accept = 0
 
     for mask in masks:
         aran = np.random.normal(scale=scale, size=arr.shape)
         nbrs = (np.roll(arr, 1, axis=0), np.roll(arr, -1, axis=0),
                 np.roll(arr, 1, axis=1), np.roll(arr, -1, axis=1))
-
-        # 
+        
         en0 = one_energy_checkerboard(arr, nbrs)
         en1 = one_energy_checkerboard(arr + aran, nbrs)
-        diff = en1 - en0
+        dE = en1 - en0
+        
+        rand = np.random.uniform(0.0, 1.0, size=arr.shape)
+        ok = (dE <= 0) | (np.exp(-np.maximum(dE, 0) / Ts) >= rand)
+        ok &= mask
+
+        arr += np.where(ok, aran, 0.0)
+        accept += ok.sum()
+
+    return accept / (nmax * nmax)
 
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
