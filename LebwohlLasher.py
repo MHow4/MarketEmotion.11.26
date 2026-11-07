@@ -1,4 +1,4 @@
-#python -m cProfile LebwohlLasher.py 100 64 0.5 0 > size_steps.txt
+#python -m cProfile LebwohlLasher.py 100 64 0.65 0 > size_steps.txt
 """
 Basic Python Lebwohl-Lasher code.  Based on the paper 
 P.A. Lebwohl and G. Lasher, Phys. Rev. A, 6, 426-429 (1972).
@@ -208,6 +208,12 @@ def get_order(arr,nmax):
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
     return eigenvalues.max()
 #=======================================================================
+def checkerboard(nmax):
+    # nmax must be even (or no checkerboard pattern is possible)
+    # change for test
+    i, j = np.indices((nmax, nmax))
+    return [(i + j) % 2 == 0, (i + j) % 2 == 1]
+
 def MC_step(arr,Ts,nmax):
     """
     Arguments:
@@ -254,6 +260,8 @@ def MC_step(arr,Ts,nmax):
                 else:
                     arr[ix,iy] -= ang
     return accept/(nmax*nmax)
+
+
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
     """
