@@ -162,6 +162,13 @@ def one_energy(arr,ix,iy,nmax):
     ang = arr[ix,iy]-arr[ix,iym]
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
+
+def one_energy_checkerboard(centre, nbrs):
+    # centre: array of angles at the sites; nbrs: tuple of 4 neighbour arrays
+    en = 0.0
+    for nb in nbrs:
+        en = en + 0.5 * (1.0 - 3.0 * np.cos(centre - nb) ** 2)
+    return en
 #=======================================================================
 def all_energy(arr,nmax):
     """
@@ -210,10 +217,10 @@ def get_order(arr,nmax):
 #=======================================================================
 def checkerboard(nmax):
     # nmax must be even (or no checkerboard pattern is possible)
-    # change for test
+    # note : need to use "git push origin HEAD:master"
     i, j = np.indices((nmax, nmax))
     return [(i + j) % 2 == 0, (i + j) % 2 == 1]
-
+'''
 def MC_step(arr,Ts,nmax):
     """
     Arguments:
@@ -260,7 +267,25 @@ def MC_step(arr,Ts,nmax):
                 else:
                     arr[ix,iy] -= ang
     return accept/(nmax*nmax)
+'''
+def MC_step(arr, Ts, nmax):
 
+    scale = 0.1 + Ts
+    i, j = np.indices((nmax, nmax))
+    masks = [(i + j) % 2 == 0,
+             (i + j) % 2 == 1]
+
+
+
+    for mask in masks:
+        aran = np.random.normal(scale=scale, size=arr.shape)
+        nbrs = (np.roll(arr, 1, axis=0), np.roll(arr, -1, axis=0),
+                np.roll(arr, 1, axis=1), np.roll(arr, -1, axis=1))
+
+        # 
+        en0 = one_energy_checkerboard(arr, nbrs)
+        en1 = one_energy_checkerboard(arr + aran, nbrs)
+        diff = en1 - en0
 
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
