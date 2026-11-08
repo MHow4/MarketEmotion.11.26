@@ -261,6 +261,7 @@ def MC_step(arr, Ts, nmax):
     return accept / (nmax * nmax)
 
 #=======================================================================
+'''
 def main(program, nsteps, nmax, temp, pflag):
     """
     Arguments:
@@ -301,6 +302,16 @@ def main(program, nsteps, nmax, temp, pflag):
     # Plot final frame of lattice and generate output file
     savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
     plotdat(lattice,pflag,nmax)
+'''
+def main(program, nsteps, nmax, temp, pflag ):
+    # determine rank and size of node
+    comm = MPI.COMM_WORLD
+    rank, size = comm.rank, comm.size
+
+    # strip sizes ( handles nmax not divisible by size )
+    counts = [nmax // size + (r < nmax % size) for r in range(size)]
+    row0 = sum(counts[:rank])
+    nloc = counts[rank]
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
