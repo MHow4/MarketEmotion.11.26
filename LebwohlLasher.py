@@ -286,10 +286,13 @@ def MC_step(arr, Ts, nmax):
         en1 = one_energy_checkerboard(arr + aran, nbrs)
         dE = en1 - en0
         
+        # Metropolis test: accept if dE <= 0, else with prob exp(-dE/Ts)
         rand = np.random.uniform(0.0, 1.0, size=arr.shape)
         ok = (dE <= 0) | (np.exp(-np.maximum(dE, 0) / Ts) >= rand)
+        # only update the current sublattice
         ok &= mask
 
+        # update accepted sites
         arr += np.where(ok, aran, 0.0)
         accept += ok.sum()
 
