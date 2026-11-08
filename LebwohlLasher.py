@@ -270,18 +270,23 @@ def MC_step(arr,Ts,nmax):
 '''
 def MC_step(arr, Ts, nmax):
 
+    # constants
+    scale = 0.1 + Ts
+    accept = 0
+    # create checkerboard masks
     i, j = np.indices((nmax, nmax))
     masks = [(i + j) % 2 == 0,
              (i + j) % 2 == 1]
-    
-    scale = 0.1 + Ts
-    accept = 0
+
 
     for mask in masks:
+        # for each sublattice, generate random changes and compute energies
+        # each sublattice is updated independently ( due to the checkerboard )
+        # this means the energy changes can be computed in parallel for all sites in the sublattice
         aran = np.random.normal(scale=scale, size=arr.shape)
         nbrs = (np.roll(arr, 1, axis=0), np.roll(arr, -1, axis=0),
                 np.roll(arr, 1, axis=1), np.roll(arr, -1, axis=1))
-        
+    
         en0 = one_energy_checkerboard(arr, nbrs)
         en1 = one_energy_checkerboard(arr + aran, nbrs)
         dE = en1 - en0
