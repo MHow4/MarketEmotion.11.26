@@ -1,50 +1,55 @@
-# cython: language_level=3
+# cython: language_level=3, boundscheck=False, wraparound=False
+# cython: cdivision=True, initializedcheck=False
 import numpy as np
-cimport numpy as cnp
+from libc.math cimport cos, sin, exp
+from cython.parallel cimport prange
 
-cnp.import_array()
+cdef inline double pair_energy(double a, double b) noexcept nogil:
+    cdef double c = cos(a - b)
+    return 0.5 * (1.0 - 3.0 * c * c)
+
+cdef double one_energy(double[:, ::1] arr, int ix, int iy, int nmax) noexcept nogil:
+    cdef int ixp = ix + 1 if ix < nmax - 1 else 0
+    cdef int ixm = ix - 1 if ix > 0 else nmax - 1
+    cdef int iyp = iy + 1 if iy < nmax - 1 else 0
+    cdef int iym = iy - 1 if iy > 0 else nmax - 1
+
+    cdef double c = arr[ix, iy]
+    return (pair_energy(c, arr[ixp, iy]) + pair_energy(c, arr[ixm, iy]) +
+            pair_energy(c, arr[ix, iyp]) + pair_energy(c, arr[ix, iym]))
 
 
-def one_energy_checkerboard(cnp.ndarray centre, tuple nbrs):
-    # centre: array of angles at the sites; nbrs: tuple of 4 neighbour arrays
-    cdef cnp.ndarray en = np.zeros_like(centre)
-    cdef cnp.ndarray nb
-    for nb in nbrs:
-        en = en + 0.5 * (1.0 - 3.0 * np.cos(centre - nb) ** 2)
-    return en
-
-
-def MC_step(cnp.ndarray arr, double Ts, int nmax):
+def MC_step(double[:, ::1] arr, double Ts, int nmax):
     # constants
     cdef double scale = 0.1 + Ts
     cdef long accept = 0
 
-    # create checkerboard masks
-    cdef cnp.ndarray i, j
-    i, j = np.indices((nmax, nmax))
-    cdef list masks = [(i + j) % 2 == 0,
-                       (i + j) % 2 == 1]
+    cdef int parity, i, j, j0
+    cdef double old, e0, e1, dE
+    cdef double[:, ::1] aran, rnd
 
-    cdef cnp.ndarray mask, aran, en0, en1, dE, rand, ok
-    cdef tuple nbrs
-
-    for mask in masks:
+    for parity in range(2):
+        # random numbers are generated up front
         aran = np.random.normal(scale=scale, size=(nmax, nmax))
-        nbrs = (np.roll(arr, 1, axis=0), np.roll(arr, -1, axis=0),
-                np.roll(arr, 1, axis=1), np.roll(arr, -1, axis=1))
+        rnd = np.random.uniform(0.0, 1.0, size=(nmax, nmax))
 
-        en0 = one_energy_checkerboard(arr, nbrs)
-        en1 = one_energy_checkerboard(arr + aran, nbrs)
-        dE = en1 - en0
+        # sites with (i+j)%2 == parity have no neighbours so can be updated in parallel.
+        for i in prange(nmax, nogil=True, schedule='static'):
 
-        # Metropolis test: accept if dE <= 0, else with prob exp(-dE/Ts)
-        rand = np.random.uniform(0.0, 1.0, size=(nmax, nmax))
-        ok = (dE <= 0) | (np.exp(-np.maximum(dE, 0) / Ts) >= rand)
-        # only update the current sublattice
-        ok &= mask
+            j0 = (i + parity) % 2
+            for j in range(j0, nmax, 2):
 
-        # update accepted sites
-        arr += np.where(ok, aran, 0.0)
-        accept += ok.sum()
+                # calculate energies
+                old = arr[i, j]
+                e0 = one_energy(arr, i, j, nmax)
+                arr[i, j] = old + aran[i, j]
+                e1 = one_energy(arr, i, j, nmax)
+                dE = e1 - e0
 
-    return accept / (nmax * nmax)
+                # energy update check
+                if dE <= 0.0 or exp(-dE / Ts) >= rnd[i, j]:
+                    accept += 1
+                else:
+                    arr[i, j] = old
+
+    return accept / (<double>nmax * nmax)
