@@ -29,7 +29,7 @@ def MC_step(cnp.ndarray arr, double Ts, int nmax):
     cdef tuple nbrs
 
     for mask in masks:
-        aran = np.random.normal(scale=scale, size=arr.shape)
+        aran = np.random.normal(scale=scale, size=(nmax, nmax))
         nbrs = (np.roll(arr, 1, axis=0), np.roll(arr, -1, axis=0),
                 np.roll(arr, 1, axis=1), np.roll(arr, -1, axis=1))
 
@@ -38,7 +38,7 @@ def MC_step(cnp.ndarray arr, double Ts, int nmax):
         dE = en1 - en0
 
         # Metropolis test: accept if dE <= 0, else with prob exp(-dE/Ts)
-        rand = np.random.uniform(0.0, 1.0, size=arr.shape)
+        rand = np.random.uniform(0.0, 1.0, size=(nmax, nmax))
         ok = (dE <= 0) | (np.exp(-np.maximum(dE, 0) / Ts) >= rand)
         # only update the current sublattice
         ok &= mask
