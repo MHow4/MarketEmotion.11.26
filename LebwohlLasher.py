@@ -263,6 +263,33 @@ def MC_step(arr, Ts, nmax):
 
     return accept / (nmax * nmax)
 
+def global_observables(loc, nmax, comm, up, down):
+    halo_exchange(loc, comm, up, down)      # last colour update left ghosts stale
+    centre = loc[1:-1]
+    nbrs = (loc[:-2], loc[2:],
+            np.roll(centre, 1, axis=1), np.roll(centre, -1, axis=1))
+
+    en = one_energy_checkerboard(centre, nbrs).sum()
+    nl, nmax = centre.shape
+    lab = np.vstack((np.cos(centre), np.sin(centre), np.zeros_like(centre))).reshape(3, nl, nmax)
+    delta = np.eye(3, 3)
+    Q = np.zeros((3, 3))
+    for a in range(3):
+        for b in range(3):
+            for i in range(nl):
+                for j in range(nmax):
+                    Q[a, b] += 3 * lab[a, i, j] * lab[b, i, j] - delta[a, b]
+    
+    # total energy
+    en_tot = comm.allreduce(en, op=MPI.SUM)
+    # total Q tensor
+    Q_tot = np.zeros_like(Q)
+    comm.Allreduce(Q, Q_tot, op=MPI.SUM)
+    
+    Qab = Q_tot / (2.0 * nmax * nmax)
+    return en_tot, np.linalg.eigvalsh(Qab).max()
+
+
 #=======================================================================
 '''
 def main(program, nsteps, nmax, temp, pflag):
@@ -320,7 +347,7 @@ def main(program, nsteps, nmax, temp, pflag ):
     # pulled masks into main to avoid recomputing them every step
     masks = checkerboard(row0, nloc, nmax)
 
-    # local array with halo rows ( replaces initdat )
+    # local array with halo rows ( replaces creating whole lattice on each node )
     rng = np.random.default_rng([041103, rank])
     loc = np.zeros((nloc + 2, nmax))
     loc[1:-1] = rng.random((nloc, nmax)) * 2.0 * np.pi
