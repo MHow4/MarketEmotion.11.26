@@ -1,2 +1,5 @@
 #gitignore for exiling files
 *.txt
+*.xlsx
+*.png
+*.ipynb
