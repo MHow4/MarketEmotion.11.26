@@ -26,6 +26,7 @@ SH 16-Oct-23
 import sys
 import time
 import datetime
+import comm
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -228,43 +229,36 @@ def halo_exchange(local, comm, up, down):
     comm.Sendrecv(sendbuf=local[1],  dest=up,   recvbuf=local[-1], source=down)
     comm.Sendrecv(sendbuf=local[-2], dest=down, recvbuf=local[0],  source=up)
 
-def MC_step(arr, Ts, nmax):
+def MC_step(loc, Ts, nmax, masks, comm, up, down, rng):
 
     # constants
     scale = 0.1 + Ts
     accept = 0
-    # create checkerboard masks
-    i, j = np.indices((nmax, nmax))
-    masks = [(i + j) % 2 == 0,
-             (i + j) % 2 == 1]
-
+    centre = loc[1:-1]  
 
     for mask in masks:
-        # for each sublattice, generate random changes and compute energies
-        # each sublattice is updated independently ( due to the checkerboard )
-        # this means the energy changes can be computed in parallel for all sites in the sublattice
-        aran = np.random.normal(scale=scale, size=arr.shape)
-        nbrs = (np.roll(arr, 1, axis=0), np.roll(arr, -1, axis=0),
-                np.roll(arr, 1, axis=1), np.roll(arr, -1, axis=1))
-    
-        en0 = one_energy_checkerboard(arr, nbrs)
-        en1 = one_energy_checkerboard(arr + aran, nbrs)
+        halo_exchange(loc, comm, up, down)
+
+        aran = rng.normal(scale=scale, size=centre.shape)
+        nbrs = (loc[:-2], loc[2:],
+                np.roll(centre, 1, axis=1), np.roll(centre, -1, axis=1))
+
+        en0 = one_energy_checkerboard(centre, nbrs)
+        en1 = one_energy_checkerboard(centre + aran, nbrs)
         dE = en1 - en0
-        
-        # Metropolis test: accept if dE <= 0, else with prob exp(-dE/Ts)
-        rand = np.random.uniform(0.0, 1.0, size=arr.shape)
+
+        rand = rng.random(centre.shape)
         ok = (dE <= 0) | (np.exp(-np.maximum(dE, 0) / Ts) >= rand)
         # only update the current sublattice
         ok &= mask
 
-        # update accepted sites
-        arr += np.where(ok, aran, 0.0)
-        accept += ok.sum()
-
-    return accept / (nmax * nmax)
+        centre += np.where(ok, aran, 0.0)
+        accept += int(ok.sum())
+    
+    return accept
 
 def global_observables(loc, nmax, comm, up, down):
-    halo_exchange(loc, comm, up, down)      # last colour update left ghosts stale
+    halo_exchange(loc, comm, up, down)      # last colour update left halos stale
     centre = loc[1:-1]
     nbrs = (loc[:-2], loc[2:],
             np.roll(centre, 1, axis=1), np.roll(centre, -1, axis=1))
@@ -355,6 +349,8 @@ def main(program, nsteps, nmax, temp, pflag ):
     energy = np.zeros(nsteps + 1)
     ratio = np.zeros(nsteps + 1)
     order = np.zeros(nsteps + 1)
+    energy[0], order[0] = global_observables(loc, nmax, comm, up, down)
+    ratio[0] = 0.5
 
     # plot initial frame (rank 0 only)
     if pflag != 0:
@@ -362,6 +358,18 @@ def main(program, nsteps, nmax, temp, pflag ):
         if rank == 0: 
             lattice = np.vstack(parts)
             plotdat(lattice, pflag, nmax)
+
+    # start calculations
+    comm.Barrier()
+    initial = MPI.Wtime()
+    for it in range(1, nsteps + 1):
+        acc_local = MC_step(loc, temp, nmax, masks, comm, up, down, rng)
+        acc = comm.allreduce(acc_local, op=MPI.SUM)
+
+        ratio[it] = acc / (nmax * nmax)
+        energy[it], order[it] = global_observables(loc, nmax, comm, up, down)
+    comm.Barrier()
+    runtime = MPI.Wtime() - initial
 
 #=======================================================================
 # Main part of program, getting command line arguments and calling
