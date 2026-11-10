@@ -215,11 +215,12 @@ def one_energy_checkerboard(centre, nbrs):
     for nb in nbrs:
         en = en + 0.5 * (1.0 - 3.0 * np.cos(centre - nb) ** 2)
     return en
-def checkerboard(nmax):
+def checkerboard(row0, nloc, nmax):
     # nmax must be even (or no checkerboard pattern is possible)
     # note : need to use "git push origin HEAD:master"
-    i, j = np.indices((nmax, nmax))
-    return [(i + j) % 2 == 0, (i + j) % 2 == 1]
+    i, j = np.indices((nloc, nmax))
+    i = i + row0
+    return [(i + j) % 2 == 0,(i + j) % 2 == 1]
 
 def halo_exchange(local, comm, up, down):
     comm.Sendrecv(sendbuf=local[1],  dest=up,   recvbuf=local[-1], source=down)
@@ -312,6 +313,10 @@ def main(program, nsteps, nmax, temp, pflag ):
     counts = [nmax // size + (r < nmax % size) for r in range(size)]
     row0 = sum(counts[:rank])
     nloc = counts[rank]
+    up, down = (rank - 1) % size, (rank + 1) % size
+    
+    # pulled masks into main to avoid recomputing them every step
+    masks = checkerboard(row0, nloc, nmax)
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
