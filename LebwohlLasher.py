@@ -342,7 +342,7 @@ def main(program, nsteps, nmax, temp, pflag ):
     masks = checkerboard(row0, nloc, nmax)
 
     # local array with halo rows ( replaces creating whole lattice on each node )
-    rng = np.random.default_rng([041103, rank])
+    rng = np.random.default_rng([41103, rank])
     loc = np.zeros((nloc + 2, nmax))
     loc[1:-1] = rng.random((nloc, nmax)) * 2.0 * np.pi
 
@@ -370,6 +370,17 @@ def main(program, nsteps, nmax, temp, pflag ):
         energy[it], order[it] = global_observables(loc, nmax, comm, up, down)
     comm.Barrier()
     runtime = MPI.Wtime() - initial
+
+    if rank == 0:
+        print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s, Ranks: {:d}"
+              .format(program, nmax, nsteps, temp, order[nsteps], runtime, size))
+        savedat(None, nsteps, temp, runtime, ratio, energy, order, nmax)
+
+    if pflag != 0:
+        parts = comm.gather(loc[1:-1])
+        if rank == 0: 
+            lattice = np.vstack(parts)
+            plotdat(lattice, pflag, nmax)
 
 #=======================================================================
 # Main part of program, getting command line arguments and calling
