@@ -32,6 +32,7 @@ import matplotlib as mpl
 from mpi4py import MPI
 
 #=======================================================================
+'''
 def initdat(nmax):
     """
     Arguments:
@@ -45,6 +46,7 @@ def initdat(nmax):
     """
     arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
     return arr
+'''
 #=======================================================================
 def plotdat(arr,pflag,nmax):
     """
@@ -317,6 +319,23 @@ def main(program, nsteps, nmax, temp, pflag ):
     
     # pulled masks into main to avoid recomputing them every step
     masks = checkerboard(row0, nloc, nmax)
+
+    # local array with halo rows ( replaces initdat )
+    rng = np.random.default_rng([041103, rank])
+    loc = np.zeros((nloc + 2, nmax))
+    loc[1:-1] = rng.random((nloc, nmax)) * 2.0 * np.pi
+
+    energy = np.zeros(nsteps + 1)
+    ratio = np.zeros(nsteps + 1)
+    order = np.zeros(nsteps + 1)
+
+    # plot initial frame (rank 0 only)
+    if pflag != 0:
+        parts = comm.gather(loc[1:-1])
+        if rank == 0: 
+            lattice = np.vstack(parts)
+            plotdat(lattice, pflag, nmax)
+
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
