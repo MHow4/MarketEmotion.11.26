@@ -1,4 +1,3 @@
-#python -m cProfile LebwohlLasher.py 100 64 0.5 0 > size_steps.txt
 """
 Basic Python Lebwohl-Lasher code.  Based on the paper 
 P.A. Lebwohl and G. Lasher, Phys. Rev. A, 6, 426-429 (1972).
