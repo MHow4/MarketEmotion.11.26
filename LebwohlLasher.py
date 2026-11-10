@@ -29,6 +29,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from numba import njit
+import scipy
 
 #=======================================================================
 def initdat(nmax):
@@ -208,7 +209,7 @@ def get_order(arr,nmax):
                 for j in range(nmax):
                     Qab[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
     Qab = Qab/(2*nmax*nmax)
-    eigenvalues,eigenvectors = np.linalg.eig(Qab)
+    eigenvalues = np.linalg.eigvalsh(Qab)
     return eigenvalues.max()
 #=======================================================================
 @njit
@@ -235,14 +236,12 @@ def MC_step(arr,Ts,nmax):
     # with temperature.
     scale=0.1+Ts
     accept = 0
-    xran = np.random.randint(0,high=nmax, size=(nmax,nmax))
-    yran = np.random.randint(0,high=nmax, size=(nmax,nmax))
-    aran = np.random.normal(scale=scale, size=(nmax,nmax))
+
     for i in range(nmax):
         for j in range(nmax):
-            ix = xran[i,j]
-            iy = yran[i,j]
-            ang = aran[i,j]
+            ix = np.random.randint(0, nmax)
+            iy = np.random.randint(0, nmax)
+            ang = np.random.normal(0.0, scale)
             en0 = one_energy(arr,ix,iy,nmax)
             arr[ix,iy] += ang
             en1 = one_energy(arr,ix,iy,nmax)
