@@ -9,4 +9,4 @@ ext = Extension(
     extra_compile_args=["/O2", "/openmp"],
     extra_link_args=["/openmp"],
 )
-setup(ext_modules=cythonize(ext, annotate=True))
+setup(ext_modules=cythonize(ext))
